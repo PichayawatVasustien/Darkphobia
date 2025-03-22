@@ -32,6 +32,12 @@ public class MeleeHit : MonoBehaviour
                     range.takeDMG(dmg);
                 }
 
+                BossEnemy boss = c.GetComponent<BossEnemy>();
+                if (boss != null)
+                {
+                    boss.takeDMG(dmg);
+                }
+
             }
         }
     }

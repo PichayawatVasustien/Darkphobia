@@ -5,20 +5,30 @@ using UnityEngine.EventSystems;
 public class ButtonHoverEffect : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
 {
     private Vector3 originalScale;
-    public float scaleMultiplier = 1.1f; // Adjust this value to control the size increase
+    public float scaleMultiplier = 1.1f;
+    public float scaleSpeed = 5f;
+    private Vector3 targetScale;
 
     void Start()
     {
         originalScale = transform.localScale;
+        targetScale = originalScale;
+    }
+
+    void Update()
+    {
+        // Smoothly transition to target scale (works even when time is paused)
+        transform.localScale = Vector3.Lerp(transform.localScale, targetScale, scaleSpeed * Time.unscaledDeltaTime);
     }
 
     public void OnPointerEnter(PointerEventData eventData)
     {
-        transform.localScale = originalScale * scaleMultiplier;
+        targetScale = originalScale * scaleMultiplier;
     }
 
     public void OnPointerExit(PointerEventData eventData)
     {
-        transform.localScale = originalScale;
+        targetScale = originalScale;
     }
 }
+

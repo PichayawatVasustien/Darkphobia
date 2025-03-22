@@ -5,7 +5,7 @@ public class MeleeWeapon : MonoBehaviour
     [SerializeField] float timeToAttack = 4f;
     [SerializeField] GameObject meleePrefab; // Prefab instead of fixed object
     [SerializeField] Vector2 attackSize = new Vector2(2f, 1f);
-    [SerializeField] int dmg = 1;
+    [SerializeField] float dmg = 1f; // Changed to float
     [SerializeField] float meleeDuration = 0.8f; // How long melee stays
 
     private float timer;
@@ -52,6 +52,17 @@ public class MeleeWeapon : MonoBehaviour
         Destroy(melee, meleeDuration);
     }
 
+    public void IncreaseDamage(float amount)
+    {
+        dmg += amount; // Increase damage by the specified amount
+        Debug.Log($"Melee Weapon Damage: {dmg}");
+    }
+
+    public void DecreaseTimeToAttack(float amount)
+    {
+        timeToAttack -= amount;
+        if (timeToAttack < 0.1f) timeToAttack = 0.1f; // Prevent negative values
+    }
 
     private void ApplyDamage(Collider2D[] colliders)
     {
@@ -60,21 +71,23 @@ public class MeleeWeapon : MonoBehaviour
             if (collider.TryGetComponent(out Enemy e))
             {
                 Debug.Log($"Hit Enemy: {e.name}");
-                e.takeDMG(dmg);
+                e.takeDMG(Mathf.RoundToInt(dmg)); // Convert float to int for damage
             }
             else if (collider.TryGetComponent(out slowenemy slow))
             {
                 Debug.Log($"Hit SlowEnemy: {slow.name}");
-                slow.takeDMG(dmg);
+                slow.takeDMG(Mathf.RoundToInt(dmg)); // Convert float to int for damage
             }
             else if (collider.TryGetComponent(out RangeEnemy range))
             {
                 Debug.Log($"Hit RangeEnemy: {range.name}");
-                range.takeDMG(dmg);
+                range.takeDMG(Mathf.RoundToInt(dmg)); // Convert float to int for damage
+            }
+            else if (collider.TryGetComponent(out BossEnemy boss))
+            {
+                Debug.Log($"Hit BossEnemy: {boss.name}");
+                boss.takeDMG(Mathf.RoundToInt(dmg)); // Convert float to int for damage
             }
         }
     }
 }
-
-
-

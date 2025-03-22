@@ -8,6 +8,9 @@ TagManager:
   - Bullet
   - Audio
   - Enemy
+  - Spawner
+  - Collectable
+  - Potion
   layers:
   - Default
   - TransparentFX

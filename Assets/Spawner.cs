@@ -5,9 +5,7 @@ using UnityEngine;
 public class Spawner : MonoBehaviour
 {
     [SerializeField] public GameObject template;
-    [SerializeField] public int limit = 5;
-    [SerializeField] private bool isSpawnOnce = false;
-    [SerializeField] private bool isDestroyAfterFinish = false;
+    [SerializeField] private bool isBossSpawner = false;
     [SerializeField] private float delay = 10f;
 
     [SerializeField] private GameObject leftBorder;
@@ -20,6 +18,7 @@ public class Spawner : MonoBehaviour
 
     private float minX, maxX, minY, maxY;
     private PlayerLevel playerLevel; // ✅ Reference to track player level
+    private float originalDelay;
 
     private void Start()
     {
@@ -42,58 +41,50 @@ public class Spawner : MonoBehaviour
         minY = bottomBorder.transform.position.y;
         maxY = topBorder.transform.position.y;
 
+        originalDelay = delay;
+
         SpawnAll();
     }
 
     private void Update()
     {
-        if (currentSpawned >= limit)
-        {
-            DestroySelf();
-            return;
-        }
-
-        if (nextSpawnAt <= 0)
-        {
-            Spawn();
-            nextSpawnAt = delay;
-            currentSpawned += 1;
-        }
+       if (nextSpawnAt <= 0)
+       {
+           Spawn();
+           nextSpawnAt = delay;
+       }
 
         nextSpawnAt -= Time.deltaTime;
     }
 
     public void SpawnAll()
     {
-        if (isSpawnOnce)
+        if (isBossSpawner)
         {
-            for (int i = 0; i < limit; i++)
+            for (int i = 0; i < 1; i++)
             {
                 Spawn();
             }
             DestroySelf();
         }
+        else
+        {
+            Spawn();
+        }
     }
 
     public void Spawn()
     {
-        Vector3 spawnPosition = GetRandomSpawnPosition();
-        Instantiate(template, spawnPosition, Quaternion.identity);
-    }
-
-    public void ResetSpawn()
-    {
-        nextSpawnAt = 0;
-        currentSpawned = 0;
-        SpawnAll();
+        if (template != null)
+        {
+            Vector3 spawnPosition = GetRandomSpawnPosition();
+            Instantiate(template, spawnPosition, Quaternion.identity);
+        }
     }
 
     private void DestroySelf()
     {
-        if (isDestroyAfterFinish)
-        {
-            Destroy(this.gameObject);
-        }
+        Destroy(this.gameObject);
     }
 
     private Vector3 GetRandomSpawnPosition()
@@ -104,11 +95,21 @@ public class Spawner : MonoBehaviour
         return new Vector3(spawnX, spawnY, 0);
     }
 
-    public void IncreaseSpawnRate()
+    public void IncreaseSpawnRate(int currentLevel)
     {
-        limit += 2;  
-        delay = Mathf.Max(1f, delay * 0.9f); 
-        Debug.Log("Spawner updated! New limit: " + limit + " | New delay: " + delay);
+        float increaseFactor;
+        if (currentLevel <= 30)
+        {
+            int cycleLevel = (currentLevel - 1) % 10;
+            increaseFactor = (cycleLevel / 9f) * 0.5f;
+        }
+        else
+        {
+            int cycleLevel = (currentLevel - 31) % 5;
+            increaseFactor = (cycleLevel / 4f) * 0.5f;
+        }
+        delay = originalDelay * (1 - increaseFactor);
     }
+
 }
 

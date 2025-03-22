@@ -1,22 +1,29 @@
 using UnityEngine;
+using System.Collections;
 
 public class RangeWeapon : MonoBehaviour
 {
-    [SerializeField] float timeToAttack = 1f; // Attack cooldown
+    [SerializeField] private float timeToAttack = 1f; // Attack cooldown
     private float timer;
 
-    [SerializeField] GameObject fireballPrefab; // Prefab for fireball
+    [SerializeField] private GameObject fireballPrefab; // Prefab for fireball
+    [SerializeField] private Transform firePoint; // Where the fireball spawns
+    [SerializeField] private float fireballSpeed = 5f; // Speed of the fireball
+    [SerializeField] private float fireballSpread = 15f; // Spread angle for multiple fireballs
+    [SerializeField] private float fireballDelay = 0.1f; // Delay between fireballs
+
+    [SerializeField] private bool enableDoubleFireball = false; // Toggle for double fireball
 
     private Moving playerMove;
+    private float lastHorizontalDirection = 1f; // Default right
+    private float lastVerticalDirection = 0f;   // Default no vertical movement
 
-    [SerializeField] private float lastHorizontalDirection = 1f; // Default right
-    [SerializeField] private float lastVerticalDirection = 0f;   // Default no vertical movement
+    private int fireballLevel = 1; // Track fireball level
 
     private void Awake()
     {
         playerMove = GetComponentInParent<Moving>();
     }
-
 
     private void Update()
     {
@@ -30,16 +37,6 @@ public class RangeWeapon : MonoBehaviour
             lastVerticalDirection = verticalDirection;
         }
 
-        else if (horizontalDirection != 0)
-        {
-            lastHorizontalDirection = horizontalDirection;
-        }
-
-        else if (verticalDirection != 0)
-        {
-            lastVerticalDirection = verticalDirection;
-        }
-
         if (timer < timeToAttack)
         {
             timer += Time.deltaTime;
@@ -47,28 +44,66 @@ public class RangeWeapon : MonoBehaviour
         }
 
         timer = 0;
-        SpawnFireball(lastHorizontalDirection, lastVerticalDirection);
+        StartCoroutine(SpawnFireballsWithDelay(lastHorizontalDirection, lastVerticalDirection));
     }
 
-    private void SpawnFireball(float lastHorizontalDirection, float lastVerticalDirection)
+    private IEnumerator SpawnFireballsWithDelay(float dirX, float dirY)
     {
         if (fireballPrefab != null)
         {
-            GameObject fireball = Instantiate(fireballPrefab, transform.position, Quaternion.identity);
-            RangeProjectile projectile = fireball.GetComponent<RangeProjectile>();
+            Vector2 direction = new Vector2(dirX, dirY).normalized;
 
-            if (projectile != null)
+            if (fireballLevel >= 5 || enableDoubleFireball) // Check for double fireball condition
             {
-                
+                Debug.Log("Shooting 2 fireballs with delay!");
+                float angle = fireballSpread * Mathf.Deg2Rad;
+                Vector2 direction1 = RotateDirection(direction, angle);
+                Vector2 direction2 = RotateDirection(direction, -angle);
 
-                // Fire in last direction if no movement
-                projectile.SetDirection(lastHorizontalDirection, lastVerticalDirection);
+                CreateFireball(direction1); // First fireball
+                yield return new WaitForSeconds(fireballDelay); // Delay
+                CreateFireball(direction2); // Second fireball
             }
             else
             {
-                Debug.LogError("RangeProjectile script is missing on Fireball prefab!");
+                Debug.Log("Shooting 1 fireball!");
+                CreateFireball(direction); // Single fireball
             }
         }
     }
-}
 
+    private void CreateFireball(Vector2 direction)
+    {
+        GameObject fireball = Instantiate(fireballPrefab, firePoint.position, Quaternion.identity);
+        RangeProjectile projectile = fireball.GetComponent<RangeProjectile>();
+
+        if (projectile != null)
+        {
+            projectile.SetDirection(direction.x, direction.y);
+        }
+        else
+        {
+            Debug.LogError("RangeProjectile script is missing on Fireball prefab!");
+        }
+    }
+
+    private Vector2 RotateDirection(Vector2 direction, float angle)
+    {
+        return new Vector2(
+            direction.x * Mathf.Cos(angle) - direction.y * Mathf.Sin(angle),
+            direction.x * Mathf.Sin(angle) + direction.y * Mathf.Cos(angle)
+        );
+    }
+
+    public void IncreaseFireRate(float amount)
+    {
+        timeToAttack -= amount;
+        if (timeToAttack < 0.1f) timeToAttack = 0.1f; // Prevent negative values
+    }
+
+    public void IncreaseFireballLevel()
+    {
+        fireballLevel++;
+        Debug.Log($"Fireball Level: {fireballLevel}");
+    }
+}

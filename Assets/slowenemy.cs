@@ -1,202 +1,151 @@
-﻿using UnityEngine;
+﻿using System.Collections;
+using UnityEngine;
 
 public class slowenemy : MonoBehaviour
 {
     [SerializeField] Transform targetDestination;
     private MC targetCharacter;
-    private GameObject targetGameobject;
 
-    [SerializeField] float speed = 0.7f; // Slow movement speed
-    [SerializeField] string targetTag = "Target";
+    [SerializeField] private float speed = 0.7f;
+    [SerializeField] private string targetTag = "Target";
 
     private Rigidbody2D rgdbd2d;
-    private SpriteRenderer spriteRenderer; // For glowing effect
-    [SerializeField] int experiencePoints = 30;
-    [SerializeField] int hp = 3000;
-    [SerializeField] int dmg = 3;
-    private bool isAttacking = false;
-    private PlayerLevel playerLevel;
+    private SpriteRenderer spriteRenderer;
+    private Animator animator;
+
+    [SerializeField] private int experiencePoints = 30;
+    [SerializeField] private int hp = 3000;
+    [SerializeField] private int dmg = 3;
+    private bool isDying = false;
 
     [SerializeField] private Spawnfrom spawnOnDeath;
-
     private AudioManager audioManager;
-    private bool facingRight = true; // Track the sprite's facing direction
+
+    [SerializeField] private GameObject template;
     [SerializeField] private bool isDestroyAfterFinish;
-    [SerializeField] private bool isSpawnOnce;
-    [SerializeField] public int limit;
-    [SerializeField] public GameObject template;
+    [SerializeField] private int limit;
+
+    [SerializeField] private string movementAnimation = "IdleMove";
+    [SerializeField] private string deathAnimation = "Die";
+    [SerializeField] private float deathDuration = 1.5f; // Manually set death animation time
 
     private void Awake()
     {
         rgdbd2d = GetComponent<Rigidbody2D>();
-        spriteRenderer = GetComponent<SpriteRenderer>(); // Get SpriteRenderer for glowing
+        spriteRenderer = GetComponent<SpriteRenderer>();
+        animator = GetComponent<Animator>();
         audioManager = GameObject.FindGameObjectWithTag("Audio").GetComponent<AudioManager>();
-        GameObject player = GameObject.FindGameObjectWithTag("Player");
-        playerLevel = player.GetComponent<PlayerLevel>();
 
+        GameObject player = GameObject.FindGameObjectWithTag("Player");
+        
         if (PlayerPrefs.HasKey("difficulty"))
         {
-            if (PlayerPrefs.GetString("difficulty") == "easy")
+            switch (PlayerPrefs.GetString("difficulty"))
             {
-                hp = 8;
-            }
-            else if (PlayerPrefs.GetString("difficulty") == "medium")
-            {
-                hp = 12;
-            }
-            else if (PlayerPrefs.GetString("difficulty") == "hard")
-            {
-                hp = 40;
-            }
-            else
-            {
-                hp = 12;
+                case "easy": hp = 6; break;
+                case "medium": hp = 12; break;
+                case "hard": hp = 40; break;
+                default: hp = 12; break;
             }
         }
-        else
+        else hp = 12;
+
+        if (player != null)
         {
-            hp = 12;
+            PlayerLevel playerLevel = player.GetComponent<PlayerLevel>();
+            ScaleEnemyHP(playerLevel.GetCurrentLevel());
         }
-        ScaleEnemyHP(playerLevel.GetCurrentLevel());
+
+    }
+
+    private void Start()
+    {
+        if (animator) animator.Play(movementAnimation); // Constant movement animation
     }
 
     private void FixedUpdate()
     {
-        if (targetDestination != null)
-        {
-            Vector3 direction = (targetDestination.position - transform.position).normalized;
-            rgdbd2d.velocity = direction * speed; // Slow movement
+        if (isDying || targetDestination == null) return;
 
-            // Flip the sprite based on movement direction
-            if (direction.x > 0 && !facingRight)
-            {
-                Flip();
-            }
-            else if (direction.x < 0 && facingRight)
-            {
-                Flip();
-            }
-        }
-    }
+        Vector3 direction = (targetDestination.position - transform.position).normalized;
+        rgdbd2d.velocity = direction * speed;
 
-    private void Flip()
-    {
-        facingRight = !facingRight;
-        Vector3 scale = transform.localScale;
-        scale.x *= -1; // Flip the x-axis
-        transform.localScale = scale;
+        spriteRenderer.flipX = targetDestination.position.x > transform.position.x;
     }
 
     private void OnCollisionEnter2D(Collision2D collision)
     {
-        if (collision.collider.CompareTag(targetTag))
+        if (collision.collider.CompareTag(targetTag) && !isDying)
         {
-            targetGameobject = collision.gameObject;
-            targetCharacter = targetGameobject.GetComponent<MC>();
-
-            if (targetCharacter != null && !isAttacking)
-            {
-                Attack();
-            }
-        }
-    }
-
-    private void Attack()
-    {
-        if (targetCharacter != null)
-        {
-            isAttacking = true;
-            targetCharacter.takeDMG(dmg);
+            targetCharacter = collision.gameObject.GetComponent<MC>();
+            targetCharacter?.takeDMG(dmg);
             audioManager.PlaySFX(audioManager.hurt);
-            Invoke(nameof(ResetAttack), 1.8f); // Slower attack speed
         }
     }
 
-    private void ResetAttack()
+    public void takeDMG(int damage)
     {
-        isAttacking = false;
-    }
+        if (isDying) return; // Ignore damage if already dying
 
-    public void takeDMG(int dmg)
-    {
-        hp -= dmg;
-
-        // Start glowing red when taking damage
-        StartCoroutine(GlowRed());
-
-        Debug.Log("SlowEnemy took damage: " + dmg + " | Remaining HP: " + hp);
-
-        if (hp <= 0)
+        hp -= damage;
+        if (hp > 0)
+        {
+            StartCoroutine(GlowRed()); // Flash red for damage effect
+        }
+        else
         {
             Die();
         }
     }
 
-    private void Die()
+    public void Die()
     {
-        if (playerLevel == null)
-        {
-            GameObject player = GameObject.FindGameObjectWithTag("Player");
-            if (player != null)
-            {
-                playerLevel = player.GetComponent<PlayerLevel>();
-            }
-        }
+        if (isDying) return;
+        isDying = true;
 
-        if (playerLevel != null)
-        {
-            playerLevel.GainExperience(experiencePoints);
-        }
-        else
-        {
-            Debug.LogWarning("PlayerLevel not found when enemy died!");
-        }
-
-        // ✅ Trigger the assigned Spawnfrom script when enemy dies
-        if (spawnOnDeath != null)
-        {
-            spawnOnDeath.ResetSpawn();
-        }
-        else
-        {
-            Debug.LogWarning("Spawnfrom reference is missing in Enemy!");
-        }
-        if (isSpawnOnce)
-        {
-            for (int i = 0; i < limit; i++)
-            {
-                Spawn();
-            }
-            DestorySelf();
-        }
+        // Stop all movement & physics
+        rgdbd2d.velocity = Vector2.zero;
+        rgdbd2d.simulated = false;
+        GetComponent<Collider2D>().enabled = false;
+        audioManager.PlaySFX(audioManager.slowEnemyDeath);
+        StartCoroutine(DeathSequence());
     }
 
-    private System.Collections.IEnumerator GlowRed()
+    private IEnumerator DeathSequence()
     {
-        spriteRenderer.color = Color.red; // Change color to red
-        yield return new WaitForSeconds(0.2f); // Stay red for 0.2 seconds
-        spriteRenderer.color = Color.white; // Reset color
+        if (animator)
+        {
+            animator.Play(deathAnimation); // Play death animation
+        }
+
+        yield return new WaitForSeconds(deathDuration); // Manually set duration
+
+        for (int i = 0; i < limit; i++)
+        {
+            GameObject reward = Instantiate(template, transform.position, Quaternion.identity);
+            reward.transform.localScale = template.transform.localScale;
+        }
+
+        if (isDestroyAfterFinish) Destroy(gameObject);
     }
-    public void Spawn()
+
+    private IEnumerator GlowRed()
     {
-        Instantiate(template, transform.position, Quaternion.identity);
+        spriteRenderer.color = Color.red;
+        yield return new WaitForSeconds(0.2f);
+        spriteRenderer.color = Color.white;
     }
+
     private void ScaleEnemyHP(int playerLevel)
     {
+        int pLvl = playerLevel - 1;
         if (playerLevel <= 30)
         {
-            hp += (playerLevel / 10) * hp;
+            hp += (pLvl / 10) * hp;
         }
         else
         {
-            hp += (3 * hp) + (((playerLevel - 30) / 5) * hp);
-        }
-    }
-    private void DestorySelf()
-    {
-        if (isDestroyAfterFinish)
-        {
-            Destroy(this.gameObject);
+            hp += (3 * hp) + (((pLvl - 30) / 5) * hp);
         }
     }
 }

@@ -12,7 +12,7 @@ public class MC : MonoBehaviour
 
     private void Awake()
     {
-        Time.timeScale = 1f;
+        //Time.timeScale = 1f;
         audioManager = GameObject.FindGameObjectWithTag("Audio").GetComponent<AudioManager>();
         p = GameObject.FindObjectOfType<pause>();
     }
@@ -68,6 +68,21 @@ public class MC : MonoBehaviour
         audioManager.PlaySFX(audioManager.death);
         audioManager.StopMusic();
         p.DisablePausing();
+        GameObject[] spawner = GameObject.FindGameObjectsWithTag("Spawner");
+        foreach (GameObject s in spawner)
+        {
+            Destroy(s);
+        }
+        GameObject[] objects = GameObject.FindGameObjectsWithTag("Enemy");
+        foreach (GameObject obj in objects)
+        {
+            Destroy(obj);
+        }
+        GameObject[] collectable = GameObject.FindGameObjectsWithTag("Collectable");
+        foreach (GameObject c in collectable)
+        {
+            Destroy(c);
+        }
         Time.timeScale = 0f; // Freeze the game
     }
     public void IncreaseMaxHP(int amount)
@@ -89,4 +104,8 @@ public class MC : MonoBehaviour
         UpdateHPUI();
     }
 
+    public int getMaxHp()
+    {
+        return maxHP;
+    }
 }

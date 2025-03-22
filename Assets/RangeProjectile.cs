@@ -47,6 +47,12 @@ public class RangeProjectile : MonoBehaviour
                     range.takeDMG(dmg);
                 }
 
+                BossEnemy boss = c.GetComponent<BossEnemy>();
+                if (boss != null)
+                {  
+                    boss.takeDMG(dmg);
+                }
+
                 hitDetected = true;
                 break; // Stop checking after hitting an enemy
             }

@@ -65,4 +65,10 @@ public class pause : MonoBehaviour
         pauseScreen.SetActive(false);
         pauseButton.gameObject.SetActive(false);
     }
+    
+    public void EnablePausing()
+    {
+        canPause = true;
+        pauseButton.gameObject.SetActive(true);
+    }
 }

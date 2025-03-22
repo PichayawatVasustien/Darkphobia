@@ -18,62 +18,70 @@ public class RangeEnemy : MonoBehaviour
     [SerializeField] public GameObject template;
 
     [SerializeField] private Spawnfrom spawnOnDeath;
+    [SerializeField] private float shootingRange = 5f;
 
     AudioManager audioManager;
+    private Animator animator;
+
+    // 🎥 Serialized animation names for customization
+    [SerializeField] private string idleAnim = "Idle";
+    [SerializeField] private string shootAnim = "Shoot";
+    [SerializeField] private string dieAnim = "Die";
 
     // Shooting variables
     [SerializeField] GameObject projectilePrefab;
     [SerializeField] Transform firePoint;
-    [SerializeField] float fireRate = 1f;
+    [SerializeField] float fireRate = 4f;
     [SerializeField] float projectileSpeed = 5f;
     private float nextShotAt = 0f;
     private bool isShooting = false;
     [SerializeField] public int limit;
     [SerializeField] private bool isDestroyAfterFinish;
     [SerializeField] private bool isSpawnOnce;
+    private bool isDead = false;
+    [SerializeField] private float chargeTime = 2f;
 
-    private SpriteRenderer spriteRenderer; // Renderer reference
+    [SerializeField] private float deathDuration = 2f;
+    private SpriteRenderer spriteRenderer;
 
     private void Awake()
     {
         rgdbd2d = GetComponent<Rigidbody2D>();
         audioManager = GameObject.FindGameObjectWithTag("Audio")?.GetComponent<AudioManager>();
-        spriteRenderer = GetComponent<SpriteRenderer>(); // Get the Renderer component
+        spriteRenderer = GetComponent<SpriteRenderer>();
+        animator = GetComponent<Animator>(); // Get Animator component
         GameObject player = GameObject.FindGameObjectWithTag("Player");
-        playerLevel = player.GetComponent<PlayerLevel>();
+        playerLevel = player?.GetComponent<PlayerLevel>();
 
         if (PlayerPrefs.HasKey("difficulty"))
         {
-            if (PlayerPrefs.GetString("difficulty") == "easy")
+            switch (PlayerPrefs.GetString("difficulty"))
             {
-                hp = 2;
-            }
-            else if (PlayerPrefs.GetString("difficulty") == "medium")
-            {
-                hp = 4;
-            }
-            else if (PlayerPrefs.GetString("difficulty") == "hard")
-            {
-                hp = 8;
-            }
-            else
-            {
-                hp = 4;
+                case "easy": hp = 2; break;
+                case "medium": hp = 4; break;
+                case "hard": hp = 8; break;
+                default: hp = 4; break;
             }
         }
-        else
-        {
-            hp = 4;
-        }
-        ScaleEnemyHP(playerLevel.GetCurrentLevel());
+        else hp = 4;
+
+        ScaleEnemyHP(playerLevel?.GetCurrentLevel() ?? 1);
+
+        // 🎥 Start with idle animation
+        animator.Play(idleAnim);
     }
 
     private void Update()
     {
-        if (Time.time >= nextShotAt && !isShooting)
+        if (!isDead && targetDestination != null)
         {
-            StartCoroutine(ShootRoutine());
-            nextShotAt = Time.time + fireRate + 2f; // Add 2 sec charge time to fireRate
+            float distanceToTarget = Vector2.Distance(transform.position, targetDestination.position);
+
+            if (distanceToTarget <= shootingRange && Time.time >= nextShotAt && !isShooting)
+            {
+                StartCoroutine(ShootRoutine());
+                nextShotAt = Time.time + fireRate + chargeTime;
+            }
         }
     }
 
@@ -83,28 +91,18 @@ public class RangeEnemy : MonoBehaviour
         {
             Vector3 direction = (targetDestination.position - transform.position).normalized;
             rgdbd2d.velocity = direction * speed;
+
+            spriteRenderer.flipX = targetDestination.position.x > transform.position.x;
         }
     }
 
     private void OnCollisionEnter2D(Collision2D collision)
     {
-        if (collision.collider.CompareTag(targetTag))
+        if (collision.collider.CompareTag(targetTag) && !isDead)
         {
-            targetGameobject = collision.gameObject;
-            targetCharacter = targetGameobject.GetComponent<MC>();
-
-            if (targetCharacter != null && !isAttacking)
-            {
-                Attack();
-            }
-        }
-    }
-
-    private void OnCollisionStay2D(Collision2D collision)
-    {
-        if (collision.collider.CompareTag(targetTag) && !isAttacking)
-        {
-            Attack();
+            targetCharacter = collision.gameObject.GetComponent<MC>();
+            targetCharacter?.takeDMG(dmg);
+            audioManager.PlaySFX(audioManager.hurt);
         }
     }
 
@@ -112,30 +110,18 @@ public class RangeEnemy : MonoBehaviour
     {
         isShooting = true;
         float originalSpeed = speed;
-
         speed = 0f; // Stop movement
-        yield return new WaitForSeconds(2f); // Wait for 2 seconds
+        animator.Play(shootAnim);
+        yield return new WaitForSeconds(chargeTime);
+         // Adjust based on animation duration
 
-        Shoot();
-
-        speed = originalSpeed; // Resume movement
-        isShooting = false;
-    }
-
-    private void Attack()
-    {
-        if (targetCharacter != null)
+        if (!isDead)
         {
-            isAttacking = true;
-            targetCharacter.takeDMG(dmg);
-            audioManager?.PlaySFX(audioManager.hurt);
-            Invoke(nameof(ResetAttack), 1f);
+            Shoot();
+            animator.Play(idleAnim); // 🎥 Return to idle animation
+            speed = originalSpeed;
         }
-    }
-
-    private void ResetAttack()
-    {
-        isAttacking = false;
+        isShooting = false;
     }
 
     private void Shoot()
@@ -172,73 +158,84 @@ public class RangeEnemy : MonoBehaviour
         {
             Die();
         }
-    }
-
-    private void Die()
-    {
-        if (playerLevel == null)
-        {
-            GameObject player = GameObject.FindGameObjectWithTag("Player");
-            if (player != null)
-            {
-                playerLevel = player.GetComponent<PlayerLevel>();
-            }
-        }
-
-        if (playerLevel != null)
-        {
-            playerLevel.GainExperience(experiencePoints);
-        }
         else
         {
-            Debug.LogWarning("PlayerLevel not found when enemy died!");
+            StartCoroutine(GlowRed());
         }
+    }
 
-        // ✅ Trigger the assigned Spawnfrom script when enemy dies
+    public void Die()
+    {
+        if (isDead) return;
+        isDead = true;
+
+        /*if (playerLevel != null)
+        {
+            playerLevel.GainExperience(experiencePoints);
+        }*/
+
         if (spawnOnDeath != null)
         {
             spawnOnDeath.ResetSpawn();
         }
+
+        // Stop movement & attacks
+        speed = 0f;
+        rgdbd2d.velocity = Vector2.zero;
+        rgdbd2d.isKinematic = true;
+        isShooting = true;
+        isAttacking = false;
+        GetComponent<Collider2D>().enabled = false;
+
+        // 🎥 Play death animation
+        animator.Play(dieAnim);
+        audioManager.PlaySFX(audioManager.rangeEnemyDeath);
+        StartCoroutine(WaitForDeathAnimation());
+    }
+
+    private IEnumerator WaitForDeathAnimation()
+    {
+        yield return new WaitForSeconds(animator.GetCurrentAnimatorStateInfo(0).length + deathDuration);
+
+        for (int i = 0; i < limit; i++)
+        {
+            Spawn();
+        }
+
+        DestroySelf();
+    }
+
+    private IEnumerator GlowRed()
+    {
+        spriteRenderer.color = Color.red;
+        yield return new WaitForSeconds(0.2f);
+        spriteRenderer.color = Color.white;
+    }
+
+    public void Spawn()
+    {
+        GameObject reward = Instantiate(template, transform.position, Quaternion.identity);
+        reward.transform.localScale = template.transform.localScale;
+    }
+
+    private void ScaleEnemyHP(int playerLevel)
+    {
+        int pLvl = playerLevel - 1;
+        if (playerLevel <= 30)
+        {
+            hp += (pLvl / 10) * hp;
+        }
         else
         {
-            Debug.LogWarning("Spawnfrom reference is missing in Enemy!");
-        }
-        if (isSpawnOnce)
-        {
-            for (int i = 0; i < limit; i++)
-            {
-                Spawn();
-            }
-            DestorySelf();
+            hp += (3 * hp) + (((pLvl - 30) / 5) * hp);
         }
     }
 
-    private System.Collections.IEnumerator GlowRed()
-    {
-        spriteRenderer.color = Color.red; // Change color to red
-        yield return new WaitForSeconds(0.2f); // Stay red for 0.2 seconds
-        spriteRenderer.color = Color.white; // Reset color
-    }
-    public void Spawn()
-    {
-        Instantiate(template, transform.position, Quaternion.identity);
-    }
-    private void ScaleEnemyHP(int playerLevel)
-    {
-        if (playerLevel <= 30)
-        {
-            hp += (playerLevel / 10) * hp;
-        }
-        else
-        {
-            hp += (3 * hp) + (((playerLevel - 30) / 5) * hp);
-        }
-    }
-    private void DestorySelf()
+    private void DestroySelf()
     {
         if (isDestroyAfterFinish)
         {
-            Destroy(this.gameObject);
+            Destroy(gameObject);
         }
     }
 }

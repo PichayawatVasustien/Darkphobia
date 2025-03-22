@@ -10,17 +10,27 @@ public class AudioManager : MonoBehaviour
     public AudioClip background;
     public AudioClip hurt;
     public AudioClip death;
+    public AudioClip defaultEnemyDeath;
+    public AudioClip rangeEnemyDeath;
+    public AudioClip slowEnemyDeath;
+    public AudioClip bossDeath;
+    public AudioClip Win;
+    public AudioClip start;
     //??????????????????? public AudioClip ????;
 
     private void Start()
     {
         musicSource.clip = background; 
-        musicSource.Play();
     }
 
     public void PlaySFX(AudioClip clip)
     {
         SFXSource.PlayOneShot(clip);
+    }
+
+    public void PlayMusic()
+    {
+        musicSource.Play();
     }
 
     public void StopMusic()
@@ -30,6 +40,13 @@ public class AudioManager : MonoBehaviour
 
     public void ResumeMusic()
     {
+        musicSource.UnPause();
+    }
+
+    public void PlayOtherMusic(AudioClip clip)
+    {
+        musicSource.clip = clip;
+        musicSource.Play();
         musicSource.UnPause();
     }
 }
